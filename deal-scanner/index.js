@@ -48,6 +48,59 @@ async function editMessage(chatId, messageId, text) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// ── POST /notify-payment — App sends payment request, notify admin on TG ──
+// ══════════════════════════════════════════════════════════════════════════════
+const ADMIN_CHAT_ID = '5737101178';
+
+app.post('/notify-payment', async (req, res) => {
+  try {
+    const { appName, userName, userEmail, planName, amount, requestId, projectId } = req.body || {};
+
+    if (!requestId) {
+      res.status(400).json({ error: 'requestId is required' });
+      return;
+    }
+
+    const now = new Date();
+    const timestamp = now.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+    const text = [
+      `\uD83D\uDCB0 <b>Thanh to\u00E1n m\u1EDBi!</b>`,
+      ``,
+      `\uD83D\uDCF1 App: <b>${appName || 'N/A'}</b>`,
+      `\uD83D\uDC64 User: <b>${userName || 'N/A'}</b>`,
+      `\uD83D\uDCE7 Email: ${userEmail || 'N/A'}`,
+      `\uD83D\uDCE6 G\u00F3i: <b>${planName || 'N/A'}</b>`,
+      `\uD83D\uDCB5 S\u1ED1 ti\u1EC1n: <b>${Number(amount || 0).toLocaleString()}\u0111</b>`,
+      `\uD83D\uDD11 Request ID: <code>${requestId}</code>`,
+      `\uD83D\uDD50 L\u00FAc: ${timestamp}`,
+      ``,
+      `Ch\u1ECDn h\u00E0nh \u0111\u1ED9ng \uD83D\uDC47`,
+    ].join('\n');
+
+    const pid = projectId || 'coachtt';
+
+    await axios.post(`https://api.telegram.org/bot${ADMIN_BOT_TOKEN}/sendMessage`, {
+      chat_id: ADMIN_CHAT_ID,
+      text,
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '\u2705 Duy\u1EC7t', callback_data: `approve_${requestId}_${pid}` },
+          { text: '\u274C T\u1EEB ch\u1ED1i', callback_data: `reject_${requestId}_${pid}` },
+        ]],
+      },
+    });
+
+    console.log(`[NOTIFY] Payment notification sent for ${requestId} (${pid})`);
+    res.json({ success: true, requestId, notified: true });
+  } catch (err) {
+    console.error('[NOTIFY] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // ── POST /telegram-callback — Telegram webhook for admin payment approval ──
 // ══════════════════════════════════════════════════════════════════════════════
 app.post('/telegram-callback', async (req, res) => {
